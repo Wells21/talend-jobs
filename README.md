@@ -20,7 +20,7 @@ Each subfolder in this repository contains a **dedicated Talend project**, inclu
 
 ## 📌 Featured Projects
 
-### 🔹 [Keystone Bank – Fund Transfer Data Ingestion](./keystone-fundtransfer-etl/)
+### 🔹 [Keystone Bank – Fund Transfer Data Ingestion](./talend-etl-keystone-bank/)
 **Client:** Keystone Bank  
 **Tools:** Talend Open Studio, MySQL  
 - Ingests flat files from nested folders into a centralized DB
@@ -28,7 +28,7 @@ Each subfolder in this repository contains a **dedicated Talend project**, inclu
 - Includes “T” and “T-1” daily data capture logic
 - Auto-deletes files post-load to prevent duplication
 
-📄 [Read Full Documentation](./keystone-fundtransfer-etl/documentation/documentation.md)
+📄 [Read Full Documentation](./talend-etl-keystone-bank/documentation/documentation.md)
 
 ---
 
