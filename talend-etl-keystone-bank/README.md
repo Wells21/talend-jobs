@@ -21,3 +21,10 @@ Jobs exported as `.zip` can be imported directly into Talend Open Studio.
 
 ## 📌 Sample Path Pattern
 C:/ic4proControl/YYYYMMDD/fundstransfer/MODUSER/BATCH-004/FT101020004.txt
+
+### 🧪 How to Test
+1. Clone the repo
+2. Open Talend Open Studio
+3. Import any `.zip` from `job-export/`
+4. Modify the context variables if needed
+5. Run the job to simulate flat file ingestion
