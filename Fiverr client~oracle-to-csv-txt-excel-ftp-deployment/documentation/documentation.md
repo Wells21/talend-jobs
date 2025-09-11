@@ -1,19 +1,22 @@
-# Project Documentation: End-to-End ETL Workflow
+# Project Documentation: End-to-End ETL Workflow with Terminated Employees Logic
 
 ## 1. Introduction
 
-This document provides a detailed technical walkthrough of the **End-to-End ETL Workflow** developed in **Talend Cloud Data Fabric**.  
-The goal was to automate the extraction, transformation, validation, and deployment of employee data from an Oracle database into multiple file formats with secure FTP transfer.
+This document provides a detailed walkthrough of the **ETL Workflow** developed in **Talend Cloud Data Fabric**.  
+The solution automates the extraction, transformation, validation, and deployment of employee data, while also tracking **terminated employees** by comparing consecutive job runs.
 
 ---
 
 ## 2. Project Scope
 
 - **Data Source**: Oracle database (Employee records).  
-- **Data Transformation**: Format standardization of the `workphoneno` field.  
+- **Data Transformation**: Formatting of the `workphoneno` field.  
 - **Outputs**: CSV, TXT, Excel.  
 - **Deployment**: Remote FTP server (GoAnywhere).  
-- **Environment Migration**: Test → Production via Git integration.  
+- **Additional Logic**:  
+  - Terminated employees detection.  
+  - Historical storage of terminated employees in a dedicated DB table.  
+  - Updating of a `previous_run` table after every execution.  
 - **Logging**: Implemented for cloud monitoring.  
 
 ---
@@ -21,90 +24,82 @@ The goal was to automate the extraction, transformation, validation, and deploym
 ## 3. Architecture
 
 ### High-Level Flow:
-1. **Extract** data from Oracle.  
+1. **Extract** current run data from Oracle.  
 2. **Transform** fields for consistency.  
 3. **Replicate** and write to CSV, TXT, Excel.  
 4. **Validate** file contents.  
-5. **Upload** only valid files to FTP.  
-6. **Log** every step for traceability.  
+5. **Upload** only non-empty files to FTP.  
+6. **Compare** current vs previous run to detect terminated employees.  
+7. **Store** terminated employees in DB and export to files.  
+8. **Update** previous_run table.  
+9. **Log** all steps for traceability.  
 
 ---
 
 ## 4. Detailed Component Workflow
 
 ### 4.1 Pre-Job Setup
-- **tPrejob + tJava**  
-  - Define global variables for file paths.  
-  - Append timestamps to filenames to avoid overwrites.  
-  - Handle dynamic path changes across environments (local/test vs. cloud/prod).  
+- `tPrejob + tJava`:  
+  - Dynamic global variables for file paths with timestamps.  
+  - Avoid duplicate overwrites.  
 
-### 4.2 Database Connection
-- **tDBConnection + tDBInput**  
-  - Establish Oracle DB connection.  
-  - Retrieve employee data using parameterized queries.  
+### 4.2 Active Employees Flow
+- `tDBInput`: Extract employee records.  
+- `tMap`: Transform `workphoneno`.  
+- `tReplicate`: Output to multiple file types.  
+- `tFileRowCount / tAggregateRow`: Validate row counts.  
+- `tFTPPut`: Upload validated files to FTP.  
 
-### 4.3 Transformation
-- **tMap**  
-  - Normalize `workphoneno` with custom Java expressions.  
-  - Map fields into structured output schema.  
+### 4.3 Terminated Employees Flow
+- **Comparison**:  
+  - `tDBInput` (previous_run table) as main.  
+  - `tDBInput` (current run table) as lookup.  
+  - `tMap`: Left join on primary key.  
+  - Filter rows where current PK is `null` → terminated employees.  
+- **Storage**:  
+  - `tDBOutput`: Insert terminated employees into a dedicated DB table `terminated`.  
+- **Export & Deployment**:  
+  - Save into CSV, TXT, Excel.  
+  - Row validation before FTP upload.  
 
-### 4.4 File Generation
-- **tReplicate**: Split dataset for parallel outputs.  
-- **tFileOutputDelimited (CSV, TXT)**  
-- **tFileOutputExcel (Excel)**  
+### 4.4 Post-Job Update
+- `tPostJob + tDBOutput`:  
+  - Truncate `previous_run`.  
+  - Insert current run data as new baseline.  
 
-### 4.5 File Validation
-- **CSV & TXT**: `tFileRowCount` ensures row count > 0.  
-- **Excel**: `tAggregateRow + tJavaRow` ensures non-empty content.  
-- **tRunIf conditions**: Prevents empty files from reaching FTP stage.  
-
-### 4.6 FTP Deployment
-- **tFTPPut**  
-  - Transfers validated files to **GoAnywhere FTP server**.  
-  - Configured for secure credentials and remote directory structure.  
-
-### 4.7 Logging
-- **tLogRow + tJavaRow**  
-  - Custom execution logs for each stage.  
-  - Logs include:  
-    - Start & completion time  
-    - Number of records processed  
-    - File path references  
-    - FTP success/failure status  
-  - Necessary for cloud jobs where live job visualization is not available.  
+### 4.5 Logging
+- `tLogRow + tJavaRow`: Execution logs with:  
+  - Record counts.  
+  - File paths.  
+  - FTP transfer results.  
+  - Job duration and errors.  
 
 ---
 
 ## 5. Git Integration & Cloud Deployment
 
-- Talend job versioned using **Git**.  
-- Migration path: **Local Development → Test → Production**.  
-- Environment variables dynamically adjusted to handle cloud paths.  
-- Jobs pushed to **Talend Cloud Management Console (TMC)** for execution and scheduling.  
+- Git version control for job promotion.  
+- Migration path: **Local → Test → Production**.  
+- Cloud deployment in **Talend Management Console (TMC)** with scheduling enabled.  
 
 ---
 
 ## 6. Challenges & Solutions
 
-1. **Environment-specific paths**  
-   - Solution: Used global variables and tJava for dynamic path management.  
+1. **Detecting terminated employees**  
+   - Solution: Left join on PK between previous_run and current run.  
 
-2. **Cloud job monitoring limitations**  
-   - Solution: Implemented detailed logging with tLogRow and tJavaRow.  
+2. **Maintaining previous run data**  
+   - Solution: Post-job update ensures `previous_run` is always refreshed.  
 
-3. **File validation across formats**  
-   - Solution: Used different validation techniques per file type (row count, aggregation).  
+3. **Cloud monitoring limitations**  
+   - Solution: Detailed logs via `tLogRow` and `tJavaRow`.  
 
 ---
 
 ## 7. Results
 
-- Robust and reusable ETL workflow.  
-- Automated end-to-end process with zero manual intervention.  
-- Data quality improved via transformations and validations.  
-- Logs ensured transparency in cloud execution.  
-- Secure and reliable FTP deployment.  
-
----
-
-
+- Fully automated ETL job handling **both active and terminated employees**.  
+- Enhanced HR analytics by persisting terminated employees in DB.  
+- Zero manual intervention required for validation or FTP transfers.  
+- Improved reliability, scalability, and auditability.  
